@@ -58,8 +58,8 @@ $ cd MITTENS
 Now, launch a python session in the mittens directory
 
 ```python
->>> from mittens.write_solution import write_solution
->>> write_solution("odf8", 35, 1.0)
+>>> from mittens.write_solution import write_files
+>>> write_files("odf8", 35, 1.0)
 ```
 
 This will write out two fortran files in the current directory. They are named
@@ -112,14 +112,14 @@ DSI Studio files are read directly by MITTENS:
 
 ```python
 >>> from mittens import MITTENS
->>> mitns = MITTENS(input_fib="HCP.src.gz.odf8.f5rec.fy.gqi.1.25.fib.gz")
+>>> mitns = MITTENS(fibgz_file="mgh_1001.src.gz.odf8.f5rec.bal.gqi.1.25.fib.gz")	
 ```
 
 From here you can estimate none-ahead or one-ahead, where NIfTI-1 files are
 saved for each neighbor direction:
 
 ```python
->>> mitns.calculate_transition_probabilities(output_prefix="hcp")
+>>> mitns.calculate_transition_probabilities(output_prefix="mgh")
 ```
 
 You will find the output in the current working directory (unless you specified an
@@ -130,7 +130,7 @@ Instead of re-running the estimations again, you can create a MITTENS object
 by specifying the prefix of the NIfTI files written out during estimation.
 
 ```python
->>> nifti_mitns = MITTENS(nifti_prefix="hcp")
+>>> nifti_mitns = MITTENS(nifti_prefix="mgh")
 ```
 
 This is very fast.
@@ -143,7 +143,7 @@ A graph can build directly from MITTENS object.
 
 ```python
 >>> voxel_graph = mitns.build_graph(doubleODF=True, weighting_scheme="negative_log_p")
->>> voxel_graph.save("hcp_voxel_graph.mat")
+>>> voxel_graph.save("mgh_voxel_graph.mat")
 ```
 
 There are different schemes available for weighting edges in the graph.
@@ -159,13 +159,13 @@ You can also build a matching voxel graph using probabilities from isotropic ODF
 
 ```python
 >>> null_graph = mitns.build_null_graph(doubleODF=True, purpose="shortest paths")
->>> null_graph.save("hcp_null_voxel_graph.mat")
+>>> null_graph.save("mgh_null_voxel_graph.mat")
 ```
 Both `voxel_graph` and `null_graph` will be of class `mittens.VoxelGraph`, which contains a `networkit.Graph` and spatial mapping information from the original dMRI data.  You can load these directly from disk using
 
 ```python
 >>> from mittens import VoxelGraph
->>> loaded_voxel_graph = VoxelGraph("hcp_voxel_graph.mat")
+>>> loaded_voxel_graph = VoxelGraph("mgh_voxel_graph.mat")
 >>> loaded_null_graph = VoxelGraph("hcp_null_voxel_graph.mat")
 ```
 
@@ -180,8 +180,7 @@ saved to be loaded into DSI Studio as streamlines, optionally with their corresp
 probabilities.
 
 ```python
->>> paths, probs = voxel_graph.region_voxels_to_region_query("lm1_sphere.nii.gz",
-                      "sma_sphere.nii.gz", write_trk="test", write_prob="test")
+>>> paths, probs = voxel_graph.region_voxels_to_region_query("Frontal_Inf_Orb_R.nii.gz","Hippocampus_L.nii.gz", write_trk="test.trk", write_prob="test")
 
 ```
 

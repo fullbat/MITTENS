@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+    #!/usr/bin/env python3
 import networkx as nx
 import numpy as np
 import os
@@ -217,6 +217,7 @@ class VoxelGraph(Spatial):
     def use_affine_from(self,affine_image):
         self._set_real_affine(affine_image)
     # Region of Interest functions
+    
     def add_atlas(self, atlas_nifti, min_voxels=1, connect_to_voxels=False ):
         """ Inserts bidirectional connections between a spaceless "region node"
         and all the voxels it inhabits. Also stores ROI information for querying.
@@ -331,8 +332,9 @@ class VoxelGraph(Spatial):
         to_nodes, to_name = self._get_region(to_region)
         
         # Loop over all the voxels in the from_region
-        sink_label_node = self.set_source(self.graph, to_region)
-
+        #sink_label_node = self.set_source(self.graph, from_nodes)
+        source_label_node = self.set_source(self.graph, from_nodes)
+        sink_label_node = self.set_sink(self.graph, to_nodes)
         # Find the connected components
         undirected_version = self.graph.toUndirected()
         components = networkit.components.ConnectedComponents(undirected_version)
@@ -340,7 +342,7 @@ class VoxelGraph(Spatial):
         logger.info("Found %d components in the graph", components.numberOfComponents())
         target_component = components.componentOfNode(sink_label_node)
 
-        n = networkit.graph.Dijkstra(self.graph, sink_label_node)
+        n = networkit.graph.Dijkstra(self.graph, source_label_node)
         t0 = time()
         n.run()
         t1 = time()

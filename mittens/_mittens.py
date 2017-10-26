@@ -360,6 +360,7 @@ class MITTENS(Spatial):
                 outf = output_prefix + "_doubleODF_%s_prob.nii.gz" % (nbr)
                 #logger.info("Writing %s", outf)
                 self.save_nifti(self.doubleODF_results[:,n], outf)
+
             self.save_nifti(self.doubleODF_codi, output_prefix + "_doubleODF_CoDI.nii.gz")
             self.save_nifti(self.doubleODF_coasy, output_prefix + "_doubleODF_CoAsy.nii.gz")
             self.save_nifti(self.doubleODF_results[:,-1], output_prefix + "_doubleODF_p_not_trackable.nii.gz")
@@ -402,6 +403,7 @@ class MITTENS(Spatial):
         logger.info("Pre-computing neighbor angle weights")
         Ypc = compute_weights_as_neighbor_voxels(
                 self.odf_values, (self.prob_angles_weighted > 0).astype(np.float))
+       # np.save('testnpy', Ypc)
 
         # Output matrix
         outputs = np.zeros((self.nvoxels,len(neighbor_names)),dtype=np.float)
@@ -434,6 +436,8 @@ class MITTENS(Spatial):
             self.doubleODF_results = outputs / np.nansum(outputs, 1)[:,np.newaxis]
         else:
             self.doubleODF_results = outputs
+
+        np.savetxt('test.txt', self.doubleODF_results)
 
         # Calculate the distances
         logger.info("Calculating Double ODF CoDI")
