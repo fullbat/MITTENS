@@ -2,7 +2,7 @@
 *.nii.gz
 *.fib
 *.fib.gz
-
+*.mat		
 # vim
 *.swp
 

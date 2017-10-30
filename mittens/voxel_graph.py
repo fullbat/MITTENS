@@ -1,4 +1,8 @@
-    #!/usr/bin/env python3
+#!/usr/bin/env python3
+
+from nibabel.orientations import aff2axcodes
+from nibabel.streamlines.header import Field
+from nibabel.streamlines import header
 import networkx as nx
 import numpy as np
 import os
@@ -8,6 +12,7 @@ from tqdm import tqdm
 import nibabel as nib
 import os.path as op
 import networkit
+from networkit.distance import Dijkstra
 from time import time
 from .spatial import Spatial, hdr
 try:
@@ -16,6 +21,7 @@ try:
 except ImportError:
     has_matplotlib = False
 from mittens.utils import unit_vector
+
 
 
 DISCONNECTED=999999999
@@ -241,16 +247,17 @@ class VoxelGraph(Spatial):
         return nodes, "region_%05d"%region
 
 
-    def set_source(self,g, from_id, weight=0):
-        connected_nodes = np.flatnonzero(self.atlas_labels == from_id)
-        if (from_id in self.label_lut):
-            label_node = self.label_lut[from_id]
+    def set_source(self,g, from_region, weight=0):
+        from_nodes, from_name = self._get_region(from_region)
+        connected_nodes = from_region
+        if (from_region in self.label_lut.items()):
+            label_node = self.label_lut[from_region]
         else:
             g.addNode()
             label_node = g.numberOfNodes() - 1
-            self.label_lut[from_id] = label_node
-        for connected_node in connected_nodes:
-            g.addEdge(label_node,connected_node, w=weight)
+            self.label_lut[from_region] = label_node
+        for from_node in from_nodes:
+            g.addEdge(label_node,from_node, w=weight)
         return label_node
     
     def add_source_region(self,region,weight=0):
@@ -276,18 +283,19 @@ class VoxelGraph(Spatial):
         return label_node
         
 
-    def set_sink(self,g, to_id, weight=0):
-        connected_nodes = np.flatnonzero(self.atlas_labels == to_id)
-        if (to_id in self.label_lut):
-            label_node = self.label_lut[to_id]
+    def set_sink(self,g, to_region, weight=0):
+        to_nodes, to_name = self._get_region(to_region)
+        connected_nodes = to_region
+        if (to_region in self.label_lut):
+            label_node = self.label_lut[to_region]
         else:
             g.addNode()
             label_node = g.numberOfNodes() - 1
-            self.label_lut[to_id] = label_node
-        for connected_node in connected_nodes:
-            if (g.hasEdge(label_node, connected_node)):
-                g.removeEdge(label_node, connected_node)
-            g.addEdge(connected_node,label_node, w=weight)
+            self.label_lut[to_region] = label_node
+        for to_node in to_nodes:
+            if (g.hasEdge(label_node, to_node)):
+                g.removeEdge(label_node, to_node)
+            g.addEdge(to_node,label_node, w=weight)
         return label_node
 
     def region_voxels_to_region_query(self, from_region, to_region, write_trk="", 
@@ -332,9 +340,14 @@ class VoxelGraph(Spatial):
         to_nodes, to_name = self._get_region(to_region)
         
         # Loop over all the voxels in the from_region
-        #sink_label_node = self.set_source(self.graph, from_nodes)
-        source_label_node = self.set_source(self.graph, from_nodes)
-        sink_label_node = self.set_sink(self.graph, to_nodes)
+        
+        
+        #sink_label_node = self.set_source(self.graph, to_region)
+        source_label_node = self.set_source(self.graph, from_region)
+        
+        sink_label_node = self.set_sink(self.graph, to_region)
+        
+        
         # Find the connected components
         undirected_version = self.graph.toUndirected()
         components = networkit.components.ConnectedComponents(undirected_version)
@@ -342,7 +355,10 @@ class VoxelGraph(Spatial):
         logger.info("Found %d components in the graph", components.numberOfComponents())
         target_component = components.componentOfNode(sink_label_node)
 
-        n = networkit.graph.Dijkstra(self.graph, source_label_node)
+
+        #n = networkit.distance.Dijkstra(self.graph, source_label_node)
+        n = networkit.distance.Dijkstra(self.graph, sink_label_node)
+        
         t0 = time()
         n.run()
         t1 = time()
@@ -354,6 +370,7 @@ class VoxelGraph(Spatial):
         for node in tqdm(from_nodes):
             if components.componentOfNode(node) == target_component:
                 path = n.getPath(node)
+                print("path", path)
                 if not len(path): continue
                 score = self.get_path_probability(self.graph, path)
                 probs[node] = score
@@ -381,7 +398,24 @@ class VoxelGraph(Spatial):
             self.save_nifti(maxprobs, write_wm_maxprob_map)
 
         return trk_paths, probs
+    
+    def _write_trk(self,paths, trk_file_name):
+        if not len(paths): 
+            logger.warning("Empty paths, not writing %s",trk_file_name)
+            return
 
+        header = nib.trackvis.empty_header()
+        header['voxel_order'] = ''.join(aff2axcodes(self.ras_affine))
+        header['voxel_size'] = self.voxel_size.astype("<f4")
+        header['dim'] = self.volume_grid.astype('<i2')
+        header['vox_to_ras']=self.ras_affine     
+        trk_paths = [
+            (self.voxel_coords[np.array(path[1:-1])]*self.voxel_size, 
+                None, None) for path in paths ]
+        nib.trackvis.write(trk_file_name, trk_paths, header )
+        
+        
+    """
     def _write_trk(self,paths, trk_file_name):
         if not len(paths): 
             logger.warning("Empty paths, not writing %s",trk_file_name)
@@ -393,7 +427,7 @@ class VoxelGraph(Spatial):
             (self.voxel_coords[np.array(path[1:-1])]*self.voxel_size, 
                 None, None) for path in paths ]
         nib.trackvis.write(trk_file_name, trk_paths, header )
-        
+    """   
     def _write_trk_txt(self,paths, txt_file_name):
         if not len(paths): 
             logger.warning("Empty paths, not writing %s",trk_file_name)
@@ -421,7 +455,7 @@ class VoxelGraph(Spatial):
 
     # Shortest paths
     def Dijkstra(self, g, source, sink):
-        d = networkit.graph.Dijkstra(g, source, target = sink)
+        d = networkit.distance.Dijkstra(g, source, target = sink)
         d.run()
         path = d.getPath(sink)
         return path 
@@ -621,7 +655,7 @@ class VoxelGraph(Spatial):
             n = networkit.graph.BottleneckSP(self.graph, source_label_node)
             score_func = self.get_bottleneck_scores_for_path
         else:
-            n = networkit.graph.Dijkstra(self.graph, source_label_node)
+            n = networkit.distance.Dijkstra(self.graph, source_label_node)
             score_func = self.get_scores_for_path
         t0 = time()
         n.run()
