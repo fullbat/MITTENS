@@ -356,7 +356,7 @@ class VoxelGraph(Spatial):
         target_component = components.componentOfNode(sink_label_node)
 
 
-        #n = networkit.distance.Dijkstra(self.graph, source_label_node)
+        
         n = networkit.distance.Dijkstra(self.graph, sink_label_node)
         
         t0 = time()
@@ -370,7 +370,7 @@ class VoxelGraph(Spatial):
         for node in tqdm(from_nodes):
             if components.componentOfNode(node) == target_component:
                 path = n.getPath(node)
-                print("path", path)
+                #print("path", path)
                 if not len(path): continue
                 score = self.get_path_probability(self.graph, path)
                 probs[node] = score
